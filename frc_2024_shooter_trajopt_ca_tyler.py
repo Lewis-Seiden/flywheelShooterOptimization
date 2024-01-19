@@ -27,18 +27,19 @@ robot_initial_v_z = 0.0  # ft/s
 g = 9.806
 max_launch_velocity = 25.0
 
-shooter = np.array([[field_length / 3.0], [field_width / 3.0], [1.2]])
+shooter = np.array([[10.0], [5.476], [0.242664]])
 print(shooter)
 shooter_x = shooter[0, 0]
 shooter_y = shooter[1, 0]
 shooter_z = shooter[2, 0]
+shooter_radius = 0.402
 
 target = np.array([[0.0], [5.476], [2.2]])
 print(target)
 target_x = target[0, 0]
 target_y = target[1, 0]
 target_z = target[2, 0]
-target_radius = 0.61
+target_radius = 0.4
 
 
 def lerp(a, b, t):
@@ -84,7 +85,9 @@ for k in range(N):
     problem.set_initial(state[5, k], max_launch_velocity * uvec_shooter_to_target[2, 0])
 
 # Shooter initial position
-problem.subject_to(state[:3, 0] == shooter)
+problem.subject_to(state[:2, 0] == shooter[:2])
+# Launch height varies with sine of launch angle bc mech
+problem.subject_to(state[2, 0] == shooter[2] + shooter_radius * (1 - (ca.norm_2(state[3:4, 0]) / ca.norm_2(state[3:6, 0]))))
 
 # Require initial launch velocity is below max
 # √{v_x² + v_y² + v_z²) <= vₘₐₓ
@@ -105,12 +108,15 @@ def calc_forces(x):
     # z" = −g − a_D(v_z)
     #
     # where a_D(v) = ½ρv² C_D A / m
+    # Assumes ring is always parallel to floor
     rho = 1.204  # kg/m³
     m = 0.24  # kg
     # small side
+    # C_Ds should be tested somehow, just guesses rn
     C_Ds = 0.5
     A_s = 0.018
     # face-on
+    # C_Ds should be tested somehow, just guesses rn
     C_Df = 0.5
     A_f = 0.0486
     
@@ -144,8 +150,8 @@ problem.solver("ipopt")
 sol = problem.solve()
 
 # Initial velocity vector
-v = sol.value(state[3:, 0])
-
+v = sol.value(state[3:6, 0])
+print(v)
 launch_velocity = norm(v)
 print(f"Launch velocity = {round(launch_velocity, 3)} m/s")
 
@@ -171,10 +177,12 @@ print(f"Launch velocity = {round(launch_velocity, 3)} m/s")
 # The angle between the initial velocity vector and the X-Y plane is 90° − θ.
 launch_angle = math.pi / 2.0 - math.asin(norm(v[:2]) / norm(v))
 print(f"Launch angle = {round(launch_angle * 180.0 / math.pi, 3)}°")
+print(f"Launch height = {round(sol.value(state[2, 0]), 3)}m")
+print(f"horizontal vel {sol.value(state[3:5, 0])}")
+print(1 - (norm(sol.value(state[3:4, 0])) / norm(sol.value(state[3:6, 0]))))
 
 fig = plt.figure()
 ax = plt.axes(projection="3d")
-
 
 def plot_wireframe(ax, f, x_range, y_range, color):
     x, y = np.mgrid[x_range[0] : x_range[1] : 25j, y_range[0] : y_range[1] : 25j]
