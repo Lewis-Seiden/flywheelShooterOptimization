@@ -96,7 +96,7 @@ problem.subject_to(p_x[-1] == target_x)
 problem.subject_to(p_y[-1] == target_y)
 problem.subject_to(p_z[-1] == target_z)
 
-def f(x):
+def calc_forces(x):
     # x' = x'
     # y' = y'
     # z' = z'
@@ -106,15 +106,20 @@ def f(x):
     #
     # where a_D(v) = ½ρv² C_D A / m
     rho = 1.204  # kg/m³
-    C_D = 0.5
-    A = 0.7
     m = 0.24  # kg
-    a_D = lambda v: 0.5 * rho * v**2 * C_D * A / m
+    # small side
+    C_Ds = 0.5
+    A_s = 0.018
+    # face-on
+    C_Df = 0.5
+    A_f = 0.0486
+    
+    a_D = lambda v, c_d, a: 0.5 * rho * v**2 * c_d * a / m
 
     v_x = x[3, 0]
     v_y = x[4, 0]
     v_z = x[5, 0]
-    return ca.vertcat(v_x, v_y, v_z, -a_D(v_x), -a_D(v_y), -g - a_D(v_z))
+    return ca.vertcat(v_x, v_y, v_z, -a_D(v_x, C_Ds, A_s), -a_D(v_y, C_Ds, A_s), -g - a_D(v_z, C_Df, A_f))
 
 
 # Dynamics constraints - RK4 integration
@@ -123,10 +128,10 @@ for k in range(N - 1):
     x_k = state[:, k]
     x_k1 = state[:, k + 1]
 
-    k1 = f(x_k)
-    k2 = f(x_k + h / 2 * k1)
-    k3 = f(x_k + h / 2 * k2)
-    k4 = f(x_k + h * k3)
+    k1 = calc_forces(x_k)
+    k2 = calc_forces(x_k + h / 2 * k1)
+    k3 = calc_forces(x_k + h / 2 * k2)
+    k4 = calc_forces(x_k + h * k3)
     problem.subject_to(x_k1 == x_k + h / 6 * (k1 + 2 * k2 + 2 * k3 + k4))
 
 # Minimize distance from goal over time
