@@ -19,22 +19,30 @@ from numpy.linalg import norm
 field_width = 8.2296  # 27 ft
 field_length = 16.4592  # 54 ft
 
+speaker_width = 1.189
+speaker_x = 0.0
+speaker_y = 5.476
+speaker_bottom_height = 1.984
+speaker_top_height = 2.491
+speaker_hood_height = 2.114
+speaker_hood_offset = 0.517
+
 # Robot initial velocity
-robot_initial_v_x = 0.0  # ft/s
-robot_initial_v_y = 0.0  # ft/s
+robot_initial_v_x = 1.0  # ft/s
+robot_initial_v_y = 5.0  # ft/s
 robot_initial_v_z = 0.0  # ft/s
 
 g = 9.806
 max_launch_velocity = 25.0
 
-shooter = np.array([[10.0], [5.476], [0.242664]])
+shooter = np.array([[3.0], [4.0], [0.242664]])
 print(shooter)
 shooter_x = shooter[0, 0]
 shooter_y = shooter[1, 0]
 shooter_z = shooter[2, 0]
 shooter_radius = 0.402
 
-target = np.array([[0.0], [5.476], [2.2]])
+target = np.array([[speaker_x], [speaker_y], [speaker_bottom_height + 0.1]])
 print(target)
 target_x = target[0, 0]
 target_y = target[1, 0]
@@ -99,6 +107,9 @@ problem.subject_to(p_x[-1] == target_x)
 problem.subject_to(p_y[-1] == target_y)
 problem.subject_to(p_z[-1] == target_z)
 
+# Require not to go above the hood
+problem.subject_to(p_z[:] <= speaker_hood_height)
+
 def calc_forces(x):
     # x' = x'
     # y' = y'
@@ -144,7 +155,7 @@ for k in range(N - 1):
 J = 0
 for k in range(N):
     J += (target - state[:3, k]).T @ (target - state[:3, k])
-problem.minimize(J)
+problem.minimize(T)
 
 problem.solver("ipopt")
 sol = problem.solve()
@@ -217,6 +228,16 @@ for angle in np.arange(0.0, 2.0 * math.pi, 0.1):
     ys.append(target_y + target_radius * math.cos(angle))
     zs.append(target_z + target_radius * math.sin(angle))
 ax.plot(xs, ys, zs, color="black")
+
+# Hood bottomn
+xs = []
+ys = []
+zs = []
+for dist in np.arange(-speaker_width, speaker_width, 0.1):
+    xs.append(target_x + speaker_hood_offset)
+    ys.append(target_y + dist)
+    zs.append(speaker_hood_height)
+ax.plot(xs, ys, zs, color="red")
 
 # Trajectory
 trajectory_x = sol.value(p_x)
